@@ -1,0 +1,13 @@
+package com.palak.authvault;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class AuthvaultApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
