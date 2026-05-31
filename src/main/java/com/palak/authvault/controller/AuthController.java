@@ -1,10 +1,15 @@
 package com.palak.authvault.controller;
 
-import com.palak.authvault.dto.RegisterRequest;
+import com.palak.authvault.dto.GoogleLoginRequest;
 import com.palak.authvault.dto.LoginRequest;
+import com.palak.authvault.dto.RegisterRequest;
 import com.palak.authvault.service.AuthService;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,20 +23,26 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/register")
-    public String register(@Valid @RequestBody RegisterRequest request)
-    {
-        return authService.register(
-                request.getEmail(),
-                request.getPassword()
-        );
+    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request.getEmail(), request.getPassword());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("message", "User registered successfully"));
     }
 
     @PostMapping("/login")
-    public String login(@Valid @RequestBody LoginRequest request)
-    {
-        return authService.login(
-                request.getEmail(),
-                request.getPassword()
-        );
+    public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginRequest request) {
+        String token = authService.login(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<Map<String, String>> googleLogin(@RequestBody GoogleLoginRequest request) {
+        String token = authService.loginWithGoogle(request.getIdToken());
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
     }
 }

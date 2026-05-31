@@ -1,122 +1,217 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+﻿import { useEffect, useState } from "react";
+import axios from "axios";
+import { GoogleLogin } from "@react-oauth/google";
+import "./App.css";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080",
+  headers: { "Content-Type": "application/json" },
+});
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [token, setToken] = useState(() => localStorage.getItem("authToken") || "");
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("authToken");
+    if (savedToken) {
+      setToken(savedToken);
+    }
+  }, []);
+
+  const clearForm = () => {
+    setEmail("");
+    setPassword("");
+  };
+
+  const handleRegister = async (event) => {
+    event?.preventDefault();
+    setMessage("Registering...");
+
+    try {
+      const response = await api.post("/auth/register", {
+        email,
+        password,
+      });
+
+      setMessage(response.data.message || "Registration successful.");
+      clearForm();
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "Register failed"
+      );
+    }
+  };
+
+  const handleLogin = async (event) => {
+    event?.preventDefault();
+    setMessage("Logging in...");
+
+    try {
+      const response = await api.post("/auth/login", {
+        email,
+        password,
+      });
+
+      const jwt = response.data.token;
+      localStorage.setItem("authToken", jwt);
+      setToken(jwt);
+      setMessage("Login successful. JWT stored locally.");
+      clearForm();
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "Login failed"
+      );
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const idToken = credentialResponse?.credential;
+    if (!idToken) {
+      setMessage("Google login did not return a credential.");
+      return;
+    }
+
+    setMessage("Verifying Google sign-in...");
+
+    try {
+      const response = await api.post("/auth/google", {
+        idToken,
+      });
+
+      const jwt = response.data.token;
+      localStorage.setItem("authToken", jwt);
+      setToken(jwt);
+      setMessage("Google sign-in successful. JWT stored locally.");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "Google login failed"
+      );
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    setToken("");
+    setUsers([]);
+    setMessage("Logged out.");
+  };
+
+  const fetchUsers = async () => {
+    if (!token) {
+      setMessage("Please login first to fetch users.");
+      return;
+    }
+
+    try {
+      const response = await api.get("/users", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setUsers(response.data || []);
+      setMessage("Users fetched successfully.");
+    } catch (error) {
+      setUsers([]);
+      setMessage(
+        error.response?.data?.error || error.response?.data || error.message ||
+          "Failed to load users"
+      );
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-header">
+          <h1>AuthVault</h1>
+          <p>Register, login, or sign in with Google to access protected user data.</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={mode === "login" ? "tab active" : "tab"}
+            onClick={() => setMode("login")}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            className={mode === "register" ? "tab active" : "tab"}
+            onClick={() => setMode("register")}
+          >
+            Signup
+          </button>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+        <form className="auth-form" onSubmit={mode === "login" ? handleLogin : handleRegister}>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </label>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </label>
+
+          <div className="auth-actions">
+            <button type="submit" className="primary">
+              {mode === "login" ? "Login" : "Create account"}
+            </button>
+            <button type="button" className="secondary" onClick={fetchUsers}>
+              Fetch protected users
+            </button>
+          </div>
+        </form>
+
+        <div className="google-login-row">
+          <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setMessage("Google sign-in failed.")} />
+        </div>
+
+        <div className="auth-footer">
+          <p>{message}</p>
+          {token && (
+            <div className="token-row">
+              <span>JWT stored locally.</span>
+              <button type="button" className="link-button" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {users.length > 0 && (
+        <div className="users-panel">
+          <h2>Protected Users</h2>
           <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
+            {users.map((user) => (
+              <li key={user.id}>{user.email}</li>
+            ))}
           </ul>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
