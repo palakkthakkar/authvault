@@ -1,5 +1,6 @@
 package com.palak.authvault.controller;
 
+import com.palak.authvault.dto.UserResponseDto;
 import com.palak.authvault.entity.User;
 import com.palak.authvault.service.UserService;
 import java.util.List;
@@ -27,7 +28,7 @@ public class UserController {
     }
 
     @GetMapping
-    public List<User> getUsers(){
+    public List<UserResponseDto> getUsers(){
         return userService.getUsers();
     }
 

@@ -1,5 +1,6 @@
 package com.palak.authvault.service;
 
+import com.palak.authvault.dto.UserResponseDto;
 import com.palak.authvault.entity.User;
 import com.palak.authvault.repository.UserRepository;
 import java.util.List;
@@ -17,8 +18,11 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public List<User> getUsers(){
-        return userRepository.findAll();
+    public List<UserResponseDto> getUsers(){
+        List<User> users = userRepository.findAll();
+        return users.stream()
+                .map(user -> new UserResponseDto(user.getId(), user.getEmail()))
+                .toList();
     }
 
     public void deleteUser(Long id) {

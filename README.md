@@ -126,19 +126,58 @@ The current code generates JWT tokens, but it does not yet validate JWTs for inc
 - Maven
 - PostgreSQL
 
+### Environment Variables
+
+This project uses environment variables for sensitive configuration. Do not commit `.env` files to version control.
+
+#### Backend Setup
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update `.env` with your actual values:
+   ```env
+   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/authvault
+   SPRING_DATASOURCE_USERNAME=postgres
+   SPRING_DATASOURCE_PASSWORD=your_password_here
+   JWT_SECRET=your-super-secret-key-that-is-long-enough-for-hs256
+   GOOGLE_CLIENT_ID=your_google_client_id_here
+   ```
+
+3. Load environment variables before running:
+   ```bash
+   # Linux/Mac
+   export $(cat .env | xargs)
+   ./mvnw spring-boot:run
+
+   # Windows PowerShell
+   Get-Content .env | ForEach-Object {
+       if ($_ -and !$_.StartsWith("#")) {
+           $name, $value = $_.Split("=", 2)
+           [Environment]::SetEnvironmentVariable($name, $value)
+       }
+   }
+   ./mvnw.cmd spring-boot:run
+   ```
+
+#### Frontend Setup
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cd auth-ui
+   cp .env.example .env
+   ```
+
+2. Update `.env` with your Google Client ID:
+   ```env
+   VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+   ```
+
 ### Database
 
-Update `src/main/resources/application.properties` with your database credentials.
-
-Example:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/authvault
-spring.datasource.username=postgres
-spring.datasource.password=your_password
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-```
+The database configuration is now managed via environment variables in the `.env` file. Ensure you have PostgreSQL running and the credentials are correctly set in your `.env` file.
 
 Create the database manually if needed:
 

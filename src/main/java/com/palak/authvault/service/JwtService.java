@@ -11,13 +11,18 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.function.Function;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
 
-    private static final String SECRET = "my-super-secret-key-that-is-long-enough-for-hs256";
+    private final String secret;
     private static final Duration TOKEN_VALIDITY = Duration.ofHours(1);
+
+    public JwtService(@Value("${JWT_SECRET}") String secret) {
+        this.secret = secret;
+    }
 
     public String generateToken(String email) {
         Instant now = Instant.now();
@@ -64,7 +69,7 @@ public class JwtService {
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(
-            SECRET.getBytes(StandardCharsets.UTF_8)
+            secret.getBytes(StandardCharsets.UTF_8)
         );
     }
 }
