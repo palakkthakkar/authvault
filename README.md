@@ -1,242 +1,303 @@
-# Authvault
+# AuthVault
 
-Authvault is a Spring Boot authentication service built with Java, Spring Data JPA, Spring Security, PostgreSQL, and JWT token generation.
+![Java 26](https://img.shields.io/badge/Java-26-blue?logo=java)
+![Spring Boot Snapshot](https://img.shields.io/badge/Spring%20Boot-4.1.0--SNAPSHOT-brightgreen?logo=springboot)
+![React 19](https://img.shields.io/badge/React-19.2.6-blue?logo=react)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-runtime-blue?logo=postgresql)
+![JWT](https://img.shields.io/badge/JWT-enabled-yellowgreen)
 
-## Overview
+## Project Overview
 
-This project implements a simple auth backend with:
+AuthVault is a full-stack authentication prototype that demonstrates production-grade security patterns in a compact codebase. It solves the common problem of combining credential-based login, email OTP verification, and Google OAuth sign-in with stateless JWT authorization, while keeping the backend and frontend clearly separated.
 
-- User registration (`/auth/register`)
-- User login (`/auth/login`)
-- JWT generation for authenticated users
-- Basic user CRUD operations under `/users`
-- PostgreSQL persistence via Spring Data JPA
-- Password hashing with BCrypt
+Users can:
 
-## Project Structure
+- register with email/password and verify signup with a 6-digit OTP delivered by email
+- login with email/password and receive a signed JWT
+- sign in with Google via ID token verification
+- access protected user endpoints with Bearer token authentication
 
-- `src/main/java/com/palak/authvault/AuthvaultApplication.java`
-  - Spring Boot application entry point.
+Real-world use cases:
 
-- `src/main/java/com/palak/authvault/entity/User.java`
-  - JPA entity representing a user record.
+- SaaS authentication gateway for internal admin dashboards
+- identity bootstrapping for new user onboarding (email verification + OTP)
+- hybrid login flows combining traditional credentials with social login
+- developer proof-of-concept for secure auth service architecture
 
-- `src/main/java/com/palak/authvault/repository/UserRepository.java`
-  - Spring Data repository for `User`.
-  - Includes `findByEmail(String email)`.
+The architecture is interesting because it combines Spring Boot security primitives, a custom JWT filter, PostgreSQL-backed OTP state, and a React/Vite frontend running separately with client-side auth token handling.
 
-- `src/main/java/com/palak/authvault/service/UserService.java`
-  - Generic user CRUD operations.
-  - Used by `UserController` to create, list, and delete users.
+## Key Highlights
 
-- `src/main/java/com/palak/authvault/service/AuthService.java`
-  - Authentication logic for registration and login.
-  - Hashes passwords and generates JWTs.
+- Stateless JWT authentication with custom request validation filter
+- Email-based OTP verification flow with 5-minute expiry and SMTP email delivery
+- Google sign-in integration using `oauth2.googleapis.com/tokeninfo` validation
+- BCrypt password hashing for credential-based user signup and login
+- PostgreSQL persistence through Spring Data JPA
+- React 19 + Vite frontend that stores JWT in `localStorage` and calls protected API routes
+- Custom `.env` loading via Spring `EnvironmentPostProcessor`
+- Security configuration enforcing `/auth/**` as public and protecting `/users` routes
+- Minimal but complete backend API surface with registration, login, OTP, social login, and protected resource access
 
-- `src/main/java/com/palak/authvault/service/JwtService.java`
-  - Generates JWT tokens using a shared secret.
+## Architecture
 
-- `src/main/java/com/palak/authvault/controller/AuthController.java`
-  - Exposes auth endpoints: `/auth/register` and `/auth/login`.
+AuthVault is split into two layers:
 
-- `src/main/java/com/palak/authvault/controller/UserController.java`
-  - Exposes user management endpoints: `/users`, `/users/{id}`.
+1. Backend API service (`src/main/java/com/palak/authvault`)
+   - `AuthController` handles registration, login, OTP send/verify, and Google token login
+   - `UserController` exposes protected user CRUD endpoints
+   - `AuthService` centralizes auth workflows, OTP creation, and JWT issuance
+   - `JwtService` signs and validates HS256 JWTs with a one-hour expiration
+   - `JwtAuthenticationFilter` inspects `Authorization: Bearer` headers and populates Spring Security context
+   - `SecurityConfig` enables CORS for the React app, disables CSRF, and enforces stateless sessions
+   - `.env` support is provided by `DotenvEnvironmentPostProcessor` and `spring.config.import=optional:dotenv:` in `application.properties`
 
-- `src/main/java/com/palak/authvault/config/SecurityConfig.java`
-  - Spring Security configuration.
-  - Permits `/auth/**` requests.
-  - Requires authentication for other requests.
-  - Configures `BCryptPasswordEncoder`.
+2. Frontend single-page app (`auth-ui/src`)
+   - React app uses Axios to call backend endpoints
+   - `GoogleOAuthProvider` and `@react-oauth/google` support Google login
+   - App state includes authentication token storage, OTP flows, and protected user fetches
 
-- `src/main/java/com/palak/authvault/dto/RegisterRequest.java`
-  - DTO for user registration requests.
+### Why these decisions
 
-- `src/main/java/com/palak/authvault/dto/LoginRequest.java`
-  - DTO for user login requests.
+- Spring Security + custom JWT filter: enables a real Bearer auth model rather than session cookies.
+- BCrypt password encoding: aligns with secure storage best practices for user credentials.
+- Google ID token verification on the backend: avoids trusting client-side Google assertions.
+- OTP persistence in PostgreSQL: makes email verification stateful, traceable, and expirable.
+- React + Vite: keeps the UI lightweight and developer-friendly while supporting modern auth UX.
 
-- `src/main/resources/application.properties`
-  - Database and JPA configuration.
+## Tech Stack
 
-## Dependencies
+| Layer | Technology | Version / Notes |
+|---|---|---|
+| Frontend | React | 19.2.6 |
+| Frontend | Vite | 8.0.12 |
+| Frontend | Axios | 1.16.1 |
+| Frontend | @react-oauth/google | 0.13.5 |
+| Backend | Spring Boot | 4.1.0-SNAPSHOT |
+| Backend | Spring Security | included in Spring Boot |
+| Backend | Spring Data JPA | included in Spring Boot |
+| Backend | Spring Validation | included in Spring Boot |
+| Backend | Spring Mail | included in Spring Boot |
+| Backend | JJWT | 0.12.5 |
+| Backend | Jackson Databind | included |
+| Database | PostgreSQL | runtime driver only |
+| Authentication | JWT HS256 | custom `JwtService` |
+| Authentication | OAuth | Google ID token validation |
+| Authentication | OTP | 6-digit code, 5-minute expiry |
+| DevOps | Maven Wrapper | `./mvnw`, `./mvnw.cmd` |
+| Build Tools | Maven | backend build |
+| Build Tools | npm / Vite | frontend dev & build |
+| Infrastructure | dotenv | custom `EnvironmentPostProcessor` + optional import |
 
-Key dependencies in `pom.xml`:
+## API Documentation
 
-- `spring-boot-starter-data-jpa`
-- `spring-boot-starter-webmvc`
-- `spring-boot-starter-validation`
-- `spring-boot-starter-security`
-- `postgresql`
-- `lombok` (optional, currently not used)
+### Authentication Endpoints
 
-## Supported Endpoints
+#### `POST /auth/register`
+- Request:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "Password123!"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "message": "User registered successfully"
+  }
+  ```
+- Description: registers a new user, hashes the password with BCrypt, and stores the record in PostgreSQL.
 
-### Authentication
+#### `POST /auth/login`
+- Request:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "Password123!"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "token": "<JWT_TOKEN>"
+  }
+  ```
+- Description: authenticates credentials and returns a JWT valid for 1 hour.
 
-- `POST /auth/register`
-  - Registers a user.
-  - Request body:
-    ```json
-    {
-      "email": "pala@gmail.com",
-      "password": "secret"
-    }
-    ```
-  - Response: text message.
+#### `POST /auth/send-otp`
+- Request:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "Password123!"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "message": "OTP sent to email"
+  }
+  ```
+- Description: verifies credentials, generates a 6-digit OTP, stores it with a 5-minute expiry, and sends it via SMTP email.
 
-- `POST /auth/login`
-  - Authenticates a user and returns a JWT token.
-  - Request body:
-    ```json
-    {
-      "email": "pala@gmail.com",
-      "password": "secret"
-    }
-    ```
-  - Response: JWT token string.
+#### `POST /auth/verify-otp`
+- Request:
+  ```json
+  {
+    "email": "user@example.com",
+    "otp": "123456"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "token": "<JWT_TOKEN>"
+  }
+  ```
+- Description: validates the OTP, deletes the OTP record, and returns a JWT.
 
-### User Management
+#### `POST /auth/google`
+- Request:
+  ```json
+  {
+    "idToken": "<GOOGLE_ID_TOKEN>"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "token": "<JWT_TOKEN>"
+  }
+  ```
+- Description: validates Google ID token with Google's tokeninfo endpoint, enforces `aud` matches `GOOGLE_CLIENT_ID`, and signs a local JWT.
 
-- `POST /users`
-  - Creates a new user directly.
-  - Note: This bypasses the auth registration flow and does not hash the password in the current `UserController` path.
+### Protected User Endpoints
 
-- `GET /users`
-  - Lists all users.
+> All endpoints under `/users` require `Authorization: Bearer <JWT_TOKEN>`.
 
-- `DELETE /users/{id}`
-  - Deletes a user by ID.
+#### `GET /users`
+- Response:
+  ```json
+  [
+    {"id": 1, "email": "user@example.com"}
+  ]
+  ```
+- Description: returns a lightweight user list via `UserResponseDto`.
 
-## Security Behavior
+#### `POST /users`
+- Request:
+  ```json
+  {
+    "email": "newuser@example.com",
+    "password": "password"
+  }
+  ```
+- Response:
+  ```json
+  {
+    "id": 2,
+    "email": "newuser@example.com",
+    "password": "password"
+  }
+  ```
+- Description: saves a new user record. Note: this endpoint bypasses the auth registration workflow and does not apply password hashing.
 
-Current security configuration:
+#### `DELETE /users/{id}`
+- Response:
+  ```text
+  User deleted successfully
+  ```
+- Description: deletes a user by ID.
 
-- `/auth/**` is allowed without authentication.
-- All other endpoints require authentication.
-- HTTP Basic auth is enabled for protected endpoints via `httpBasic()`.
+### Authentication Requirements
 
-### Important note
+- JWT Authentication: implemented through `JwtAuthenticationFilter` inspecting `Authorization: Bearer` headers.
+- OAuth Login: backend validates Google ID tokens by calling `https://oauth2.googleapis.com/tokeninfo?id_token=`.
+- OTP Verification: generated in `OtpService`, persisted in `OtpVerification`, and expires after 5 minutes.
+- Password Security: passwords are hashed with `BCryptPasswordEncoder` in `AuthService.register`.
+- Role-Based Access: not implemented; all authenticated users have access to `/users` endpoints.
+- API Protection: `/auth/**` is public, all other routes are protected and require valid JWTs.
+- Secrets Management: configuration values are loaded from `.env` and Spring environment properties.
 
-The current code generates JWT tokens, but it does not yet validate JWTs for incoming requests. As written, protected endpoints are secured with HTTP Basic authentication, not Bearer JWT authentication.
+## Deployment Guide
 
-## Setup
+### Local Setup
 
-### Prerequisites
+1. Backend
+   ```bash
+   cp .env.example .env
+   # Edit .env with database, JWT secret, and Google client ID
+   ./mvnw spring-boot:run
+   ```
 
-- Java 26
-- Maven
-- PostgreSQL
+2. Frontend
+   ```bash
+   cd auth-ui
+   npm install
+   npm run dev
+   ```
+
+3. Open your browser at `http://localhost:5173` and ensure the backend is reachable at `http://localhost:8080`.
 
 ### Environment Variables
 
-This project uses environment variables for sensitive configuration. Do not commit `.env` files to version control.
+Backend uses:
 
-#### Backend Setup
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `JWT_SECRET`
+- `GOOGLE_CLIENT_ID`
+- `SPRING_MAIL_USERNAME` (optional for OTP email)
+- `SPRING_MAIL_PASSWORD` (optional for OTP email)
 
-1. Copy `.env.example` to `.env`:
+Frontend uses:
+
+- `VITE_GOOGLE_CLIENT_ID`
+- `VITE_API_URL` (optional, defaults to `http://localhost:8080`)
+
+### Docker Setup
+
+This repository does not include a `Dockerfile` or `docker-compose.yml`. The canonical deployment path is currently based on Maven and Vite builds.
+
+### Production Deployment
+
+1. Build backend artifact:
    ```bash
-   cp .env.example .env
+   ./mvnw -DskipTests package
+   java -jar target/authvault-0.0.1-SNAPSHOT.jar
    ```
 
-2. Update `.env` with your actual values:
-   ```env
-   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/authvault
-   SPRING_DATASOURCE_USERNAME=postgres
-   SPRING_DATASOURCE_PASSWORD=your_password_here
-   JWT_SECRET=your-super-secret-key-that-is-long-enough-for-hs256
-   GOOGLE_CLIENT_ID=your_google_client_id_here
-   ```
-
-3. Load environment variables before running:
-   ```bash
-   # Linux/Mac
-   export $(cat .env | xargs)
-   ./mvnw spring-boot:run
-
-   # Windows PowerShell
-   Get-Content .env | ForEach-Object {
-       if ($_ -and !$_.StartsWith("#")) {
-           $name, $value = $_.Split("=", 2)
-           [Environment]::SetEnvironmentVariable($name, $value)
-       }
-   }
-   ./mvnw.cmd spring-boot:run
-   ```
-
-#### Frontend Setup
-
-1. Copy `.env.example` to `.env`:
+2. Build frontend assets:
    ```bash
    cd auth-ui
-   cp .env.example .env
+   npm ci
+   npm run build
    ```
 
-2. Update `.env` with your Google Client ID:
-   ```env
-   VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
-   ```
+3. Host the generated frontend output on any static server, and point API requests to the backend URL.
 
-### Database
+## Project Layout
 
-The database configuration is now managed via environment variables in the `.env` file. Ensure you have PostgreSQL running and the credentials are correctly set in your `.env` file.
+- `src/main/java/com/palak/authvault/config` — security and custom environment loading
+- `src/main/java/com/palak/authvault/controller` — auth and protected user endpoints
+- `src/main/java/com/palak/authvault/service` — auth workflows, JWTs, OTP generation, Google verification
+- `src/main/java/com/palak/authvault/repository` — JPA repository interfaces
+- `src/main/java/com/palak/authvault/entity` — `User` and `OtpVerification` storage models
+- `auth-ui/src` — React login/signup/OTP client
 
-Create the database manually if needed:
+## Why This Project Stands Out
 
-```sql
-CREATE DATABASE authvault;
-```
+- Demonstrates a complete stateless JWT auth pipeline, not just token issuance
+- Implements dual auth modes: traditional password login and Google social login
+- Includes an OTP email verification flow integrated with backend state
+- Uses Spring Boot security best practices, including BCrypt and custom filters
+- Supports frontend/backend separation with React + Vite and explicit CORS rules
+- Shows real-world secret handling with `.env` loading and Spring property wiring
 
-### Run the application
+## Notes for Reviewers
 
-From the project root:
-
-```bash
-./mvnw spring-boot:run
-```
-
-Or build and run:
-
-```bash
-./mvnw -DskipTests package
-java -jar target/authvault-0.0.1-SNAPSHOT.jar
-```
-
-## Testing the API
-
-Register a new user:
-
-```bash
-curl -v -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"pala@gmail.com","password":"secret"}'
-```
-
-Login and get a token:
-
-```bash
-curl -v -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"pala@gmail.com","password":"secret"}'
-```
-
-## Notes and Recommendations
-
-- `AuthService` is the correct place for registration and login logic.
-- `UserService` should remain focused on generic user CRUD.
-- `UserController` currently exposes direct user creation, which may bypass registration semantics.
-- Consider removing unused Lombok configuration if no Lombok annotations are used.
-- Implement JWT request validation if you want Bearer authentication instead of HTTP Basic for protected routes.
-
-## Possible Improvements
-
-- Add JWT validation filter to secure `/users` with bearer tokens.
-- Return structured JSON responses instead of plain strings.
-- Add exception handling and proper HTTP status codes.
-- Add unit and integration tests for auth and user flows.
-
-## File cleanup suggestions
-
-Check for the following after refactoring:
-
-- Remove unused imports and commented-out code.
-- Remove `target/` from version control.
-- Remove the Lombok dependency if it is not used.
+- The JWT validation path is active and enforced for protected endpoints.
+- Email OTP handling is stateful and expires after 5 minutes.
+- The repo uses modern Java and Spring Boot versions, plus React 19.
+- The current user CRUD endpoint should be audited for password hashing if used in production.

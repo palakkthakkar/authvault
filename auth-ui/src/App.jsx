@@ -12,6 +12,8 @@ function App() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [message, setMessage] = useState("");
   const [token, setToken] = useState(() => localStorage.getItem("authToken") || "");
   const [users, setUsers] = useState([]);
@@ -26,6 +28,8 @@ function App() {
   const clearForm = () => {
     setEmail("");
     setPassword("");
+    setOtp("");
+    setOtpSent(false);
   };
 
   const handleRegister = async (event) => {
@@ -33,16 +37,29 @@ function App() {
     setMessage("Registering...");
 
     try {
-      const response = await api.post("/auth/register", {
+      await api.post("/auth/register", {
         email,
         password,
       });
 
-      setMessage(response.data.message || "Registration successful.");
-      clearForm();
+      setMessage("Registration successful. Sending OTP to your email...");
+      
+      // Automatically send OTP after registration
+      try {
+        await api.post("/auth/send-otp", {
+          email,
+          password,
+        });
+        setOtpSent(true);
+        setMessage("OTP sent to your email. Enter it below to complete registration.");
+      } catch (otpError) {
+        setMessage(
+          otpError.response?.data?.error || otpError.message || "Failed to send OTP. Please try again."
+        );
+      }
     } catch (error) {
       setMessage(
-        error.response?.data?.error || error.message || "Register failed"
+        error.response?.data?.error || error.message || "Registration failed"
       );
     }
   };
@@ -65,6 +82,47 @@ function App() {
     } catch (error) {
       setMessage(
         error.response?.data?.error || error.message || "Login failed"
+      );
+    }
+  };
+
+  const handleSendOtp = async (event) => {
+    event?.preventDefault();
+    console.log("EMAIL =", email);
+    console.log("PASSWORD =", password);
+
+    setMessage("Sending OTP...");
+
+    try {
+      await api.post("/auth/send-otp", {
+        email,
+        password,
+      });
+      setOtpSent(true);
+      setMessage("OTP sent to your email. Enter it below to verify.");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "Sending OTP failed"
+      );
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setMessage("Verifying OTP...");
+
+    try {
+      const response = await api.post("/auth/verify-otp", {
+        email,
+        otp,
+      });
+      const jwt = response.data.token;
+      localStorage.setItem("authToken", jwt);
+      setToken(jwt);
+      setMessage("OTP verified successfully. Registration complete!");
+      clearForm();
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "OTP verification failed"
       );
     }
   };
@@ -182,6 +240,38 @@ function App() {
             </button>
           </div>
         </form>
+
+        {mode === "register" && otpSent && (
+          <div className="otp-section">
+            <h3>Verify Your Email</h3>
+            <p>An OTP has been sent to {email}. Enter it below to complete registration.</p>
+            <label>
+              OTP
+              <input
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="Enter 6-digit OTP"
+                required
+              />
+            </label>
+            <div className="auth-actions">
+              <button type="button" className="primary" onClick={handleVerifyOtp}>
+                Verify OTP
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setOtpSent(false);
+                  clearForm();
+                }}
+              >
+                Back to Register
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="google-login-row">
           <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setMessage("Google sign-in failed.")} />

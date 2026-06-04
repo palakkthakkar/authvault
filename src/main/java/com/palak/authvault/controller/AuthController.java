@@ -3,6 +3,7 @@ package com.palak.authvault.controller;
 import com.palak.authvault.dto.GoogleLoginRequest;
 import com.palak.authvault.dto.LoginRequest;
 import com.palak.authvault.dto.RegisterRequest;
+import com.palak.authvault.dto.OtpRequest;
 import com.palak.authvault.service.AuthService;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -35,9 +36,21 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("token", token));
     }
 
+    @PostMapping("/send-otp")
+    public ResponseEntity<Map<String, String>> sendOtp(@Valid @RequestBody LoginRequest request) {
+        authService.initiateOtp(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("message", "OTP sent to email"));
+    }
+
     @PostMapping("/google")
     public ResponseEntity<Map<String, String>> googleLogin(@RequestBody GoogleLoginRequest request) {
         String token = authService.loginWithGoogle(request.getIdToken());
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody OtpRequest request) {
+        String token = authService.verifyOtp(request.getEmail(), request.getOtp());
         return ResponseEntity.ok(Map.of("token", token));
     }
 

@@ -20,7 +20,7 @@ public class JwtService {
     private final String secret;
     private static final Duration TOKEN_VALIDITY = Duration.ofHours(1);
 
-    public JwtService(@Value("${JWT_SECRET}") String secret) {
+    public JwtService(@Value("${jwt.secret}") String secret) {
         this.secret = secret;
     }
 
