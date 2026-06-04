@@ -240,3 +240,43 @@ Check for the following after refactoring:
 - Remove unused imports and commented-out code.
 - Remove `target/` from version control.
 - Remove the Lombok dependency if it is not used.
+
+## APIs that I test through Postman:
+1. Register User (/auth/register)
+   Body JSON : 
+   {
+     "email": "abc@gmail.com",
+     "password": "secret"
+   }
+   
+2. Login User (/auth/login)
+   Body JSON : 
+   {
+     "email": "abc@gmail.com",
+     "password": "secret"
+   }
+   
+3. List or Post Users (GET/POST /users)
+   Protected Endpoint
+   Bearer Token : eY...
+   Response- All Users ID & email OR Registers User
+  
+4. Delete Users (DELETE /users/{id})
+   
+5. Google Signin (auth/google)
+   {
+     "idToken" : "GOOGLE_ID_TOKEN"
+   }
+
+6. MFA by OTP sending on Email (/auth/send-otp)
+   {
+     "email" : "abc@gmail.com",
+     "password" : "secret"
+   }
+  
+7. MFA by OTP verification (/auth/verify-otp)
+   {
+     "email" : "abc@gmail.com",
+     "otp": "123456"
+   }
+
