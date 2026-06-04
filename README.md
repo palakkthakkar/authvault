@@ -268,36 +268,43 @@ This repository does not include a `Dockerfile` or `docker-compose.yml`. The can
    java -jar target/authvault-0.0.1-SNAPSHOT.jar
    ```
 
-2. Build frontend assets:
-   ```bash
-   cd auth-ui
-   npm ci
-   npm run build
-   ```
+## Testing the API
 
-3. Host the generated frontend output on any static server, and point API requests to the backend URL.
+Register a new user:
 
-## Project Layout
+```bash
+curl -v -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"pala@gmail.com","password":"secret"}'
+```
 
-- `src/main/java/com/palak/authvault/config` — security and custom environment loading
-- `src/main/java/com/palak/authvault/controller` — auth and protected user endpoints
-- `src/main/java/com/palak/authvault/service` — auth workflows, JWTs, OTP generation, Google verification
-- `src/main/java/com/palak/authvault/repository` — JPA repository interfaces
-- `src/main/java/com/palak/authvault/entity` — `User` and `OtpVerification` storage models
-- `auth-ui/src` — React login/signup/OTP client
+Login and get a token:
 
-## Why This Project Stands Out
+```bash
+curl -v -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"pala@gmail.com","password":"secret"}'
+```
 
-- Demonstrates a complete stateless JWT auth pipeline, not just token issuance
-- Implements dual auth modes: traditional password login and Google social login
-- Includes an OTP email verification flow integrated with backend state
-- Uses Spring Boot security best practices, including BCrypt and custom filters
-- Supports frontend/backend separation with React + Vite and explicit CORS rules
-- Shows real-world secret handling with `.env` loading and Spring property wiring
+## Notes and Recommendations
 
-## Notes for Reviewers
+- `AuthService` is the correct place for registration and login logic.
+- `UserService` should remain focused on generic user CRUD.
+- `UserController` currently exposes direct user creation, which may bypass registration semantics.
+- Consider removing unused Lombok configuration if no Lombok annotations are used.
+- Implement JWT request validation if you want Bearer authentication instead of HTTP Basic for protected routes.
 
-- The JWT validation path is active and enforced for protected endpoints.
-- Email OTP handling is stateful and expires after 5 minutes.
-- The repo uses modern Java and Spring Boot versions, plus React 19.
-- The current user CRUD endpoint should be audited for password hashing if used in production.
+## Possible Improvements
+
+- Add JWT validation filter to secure `/users` with bearer tokens.
+- Return structured JSON responses instead of plain strings.
+- Add exception handling and proper HTTP status codes.
+- Add unit and integration tests for auth and user flows.
+
+## File cleanup suggestions
+
+Check for the following after refactoring:
+
+- Remove unused imports and commented-out code.
+- Remove `target/` from version control.
+- Remove the Lombok dependency if it is not used.
