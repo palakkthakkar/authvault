@@ -31,9 +31,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginRequest request) {
-        String token = authService.login(request.getEmail(), request.getPassword());
-        return ResponseEntity.ok(Map.of("token", token));
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
+        Map<String, Object> response = authService.login(request.getEmail(), request.getPassword(), request.getOtp());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/send-otp")
@@ -52,6 +52,32 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody OtpRequest request) {
         String token = authService.verifyOtp(request.getEmail(), request.getOtp());
         return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @PostMapping("/mfa/setup")
+    public ResponseEntity<Map<String, String>> setupMfa(@Valid @RequestBody LoginRequest request) {
+        System.out.println("MFA setup endpoint reached");
+
+        String qrCodeData = authService.setupMfa(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("qrCodeData", qrCodeData));
+    }
+
+    @PostMapping("/mfa/verify-setup")
+    public ResponseEntity<Map<String, String>> verifyMfaSetup(@Valid @RequestBody OtpRequest request) {
+        String token = authService.verifyMfaSetup(request.getEmail(), request.getOtp());
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @PostMapping("/mfa/disable")
+    public ResponseEntity<Map<String, String>> disableMfa(@Valid @RequestBody LoginRequest request) {
+        authService.disableMfa(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("message", "MFA disabled successfully"));
+    }
+
+    @PostMapping("/mfa/status")
+    public ResponseEntity<Map<String, Object>> mfaStatus(@Valid @RequestBody LoginRequest request) {
+        boolean enabled = authService.isMfaEnabled(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("mfaEnabled", enabled));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

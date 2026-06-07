@@ -21,13 +21,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
-
     
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        System.out.println("REQUEST URI = " + request.getRequestURI());
+        System.out.println("CONTEXT PATH = " + request.getContextPath());
+        
         String requestPath = request.getRequestURI();
         // Skip JWT validation for /auth/** endpoints
         if (requestPath.startsWith("/auth/")) {

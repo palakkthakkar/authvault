@@ -18,6 +18,10 @@ public class User {
 
     private String password;
 
+    private boolean mfaEnabled;
+
+    private String mfaSecret;
+
     // getters setters
     public Long getId() {
         return id;
@@ -41,5 +45,21 @@ public class User {
     
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public boolean isMfaEnabled() {
+        return mfaEnabled;
+    }
+
+    public void setMfaEnabled(boolean mfaEnabled) {
+        this.mfaEnabled = mfaEnabled;
+    }
+
+    public String getMfaSecret() {
+        return mfaSecret;
+    }
+
+    public void setMfaSecret(String mfaSecret) {
+        this.mfaSecret = mfaSecret;
     }
 }

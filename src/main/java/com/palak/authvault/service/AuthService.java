@@ -2,6 +2,7 @@ package com.palak.authvault.service;
 
 import com.palak.authvault.entity.User;
 import com.palak.authvault.repository.UserRepository;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -32,6 +33,9 @@ public class AuthService {
     @Autowired
     private OtpRepository otpRepository;
 
+    @Autowired
+    private MfaService mfaService;
+
     public void register(String email, String password) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already exists");
@@ -43,7 +47,7 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    public String login(String email, String password) {
+    public Map<String, Object> login(String email, String password, String otp) {
         User user = userRepository.findByEmail(email).orElseThrow(
             () -> new IllegalArgumentException("User not found")
         );
@@ -52,7 +56,16 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid password");
         }
 
-        return jwtService.generateToken(user.getEmail());
+        if (user.isMfaEnabled()) {
+            if (otp == null || otp.isBlank()) {
+                return Map.of("mfaRequired", true);
+            }
+            if (!mfaService.verifyCode(user.getMfaSecret(), otp)) {
+                throw new IllegalArgumentException("Invalid MFA code");
+            }
+        }
+
+        return Map.of("token", jwtService.generateToken(user.getEmail()));
     }
 
     public String loginWithGoogle(String idToken) {
@@ -67,6 +80,67 @@ public class AuthService {
         }
 
         return jwtService.generateToken(email);
+    }
+
+    public String setupMfa(String email, String password) {
+        User user = userRepository.findByEmail(email).orElseThrow(
+            () -> new IllegalArgumentException("User not found")
+        );
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Invalid password");
+        }
+
+        String secret = mfaService.generateSecret();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(false);
+        userRepository.save(user);
+
+        return mfaService.generateQrCodeDataUrl(secret, user.getEmail());
+    }
+
+    public String verifyMfaSetup(String email, String otp) {
+        User user = userRepository.findByEmail(email).orElseThrow(
+            () -> new IllegalArgumentException("User not found")
+        );
+
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new IllegalArgumentException("MFA setup has not been started for this user");
+        }
+
+        if (!mfaService.verifyCode(user.getMfaSecret(), otp)) {
+            throw new IllegalArgumentException("Invalid MFA code");
+        }
+
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+        return jwtService.generateToken(email);
+    }
+
+    public void disableMfa(String email, String password) {
+        User user = userRepository.findByEmail(email).orElseThrow(
+            () -> new IllegalArgumentException("User not found")
+        );
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Invalid password");
+        }
+
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+    }
+
+    public boolean isMfaEnabled(String email, String password) {
+        User user = userRepository.findByEmail(email).orElseThrow(
+            () -> new IllegalArgumentException("User not found")
+        );
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Invalid password");
+        }
+
+        return user.isMfaEnabled();
     }
 
     public void initiateOtp(String email, String password) {

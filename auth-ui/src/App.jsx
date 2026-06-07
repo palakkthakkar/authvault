@@ -17,7 +17,17 @@ function App() {
   const [message, setMessage] = useState("");
   const [token, setToken] = useState(() => localStorage.getItem("authToken") || "");
   const [users, setUsers] = useState([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelMinimized, setPanelMinimized] = useState(false);
+  const [panelMaximized, setPanelMaximized] = useState(false);
+  const [mfaToggleOn, setMfaToggleOn] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaSetupPending, setMfaSetupPending] = useState(false);
+  const [mfaQrCodeData, setMfaQrCodeData] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [loginMfaRequired, setLoginMfaRequired] = useState(false);
 
+  //token is initialized from localStorage, so we can check for existing token on app load
   useEffect(() => {
     const savedToken = localStorage.getItem("authToken");
     if (savedToken) {
@@ -29,6 +39,7 @@ function App() {
     setEmail("");
     setPassword("");
     setOtp("");
+    setMfaCode("");
     setOtpSent(false);
   };
 
@@ -72,13 +83,21 @@ function App() {
       const response = await api.post("/auth/login", {
         email,
         password,
+        otp: mfaCode || undefined,
       });
+
+      if (response.data.mfaRequired) {
+        setLoginMfaRequired(true);
+        setMessage("MFA is enabled. Enter the code from your SafeAuth app.");
+        return;
+      }
 
       const jwt = response.data.token;
       localStorage.setItem("authToken", jwt);
       setToken(jwt);
       setMessage("Login successful. JWT stored locally.");
       clearForm();
+      setLoginMfaRequired(false);
     } catch (error) {
       setMessage(
         error.response?.data?.error || error.message || "Login failed"
@@ -86,26 +105,127 @@ function App() {
     }
   };
 
-  const handleSendOtp = async (event) => {
-    event?.preventDefault();
-    console.log("EMAIL =", email);
-    console.log("PASSWORD =", password);
+  const handleToggleMfa = async () => {
+    if (!email || !password) {
+      setMessage("Enter email and password first to manage MFA.");
+      return;
+    }
 
-    setMessage("Sending OTP...");
+    if (mfaToggleOn) {
+      setMessage("Disabling MFA...");
+      try {
+        await api.post("/auth/mfa/disable", { email, password });
+        setMfaToggleOn(false);
+        setMfaEnabled(false);
+        setMfaSetupPending(false);
+        setMfaQrCodeData("");
+        setMfaCode("");
+        setMessage("MFA disabled successfully.");
+      } catch (error) {
+        setMessage(
+          error.response?.data?.error || error.message || "Unable to disable MFA"
+        );
+      }
+      return;
+    }
 
+    setMessage("Checking MFA status...");
     try {
-      await api.post("/auth/send-otp", {
-        email,
-        password,
-      });
-      setOtpSent(true);
-      setMessage("OTP sent to your email. Enter it below to verify.");
+      const response = await api.post("/auth/mfa/status", { email, password });
+      const enabled = response.data.mfaEnabled;
+      setMfaEnabled(enabled);
+      setMfaToggleOn(true);
+      setMfaSetupPending(!enabled);
+      setMfaQrCodeData("");
+      setMfaCode("");
+      setMessage(
+        enabled
+          ? "MFA is already enabled for this account."
+          : "MFA is disabled. Click Setup MFA to configure it."
+      );
     } catch (error) {
       setMessage(
-        error.response?.data?.error || error.message || "Sending OTP failed"
+        error.response?.data?.error || error.message || "Unable to check MFA status"
+      );
+      setMfaToggleOn(false);
+    }
+  };
+
+  const handleSetupMfa = async () => {
+    if (!email || !password) {
+      setMessage("Enter email and password first to begin MFA setup.");
+      return;
+    }
+
+    setMessage("Generating MFA QR code...");
+    try {
+      const response = await api.post("/auth/mfa/setup", { email, password });
+      setMfaQrCodeData(response.data.qrCodeData);
+      setMfaSetupPending(false);
+      setMfaEnabled(false);
+      setMessage("Scan the QR code in SafeAuth and enter the code it generates.");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "MFA setup failed"
       );
     }
   };
+
+  const handleVerifyMfaSetup = async () => {
+    if (!mfaCode) {
+      setMessage("Enter the code from SafeAuth to confirm MFA setup.");
+      return;
+    }
+
+    setMessage("Verifying MFA setup...");
+    try {
+      const response = await api.post("/auth/mfa/verify-setup", {
+        email,
+        otp: mfaCode,
+      });
+
+      const jwt = response.data.token;
+      localStorage.setItem("authToken", jwt);
+      setToken(jwt);
+      setMfaEnabled(true);
+      setMfaToggleOn(true);
+      setMfaQrCodeData("");
+      setMfaCode("");
+      setMessage("MFA setup complete and login successful.");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error || error.message || "MFA verification failed"
+      );
+    }
+  };
+
+  const handleCancelMfaSetup = () => {
+    setMfaQrCodeData("");
+    setMfaCode("");
+    setMfaSetupPending(true);
+    setMessage("MFA setup cancelled. You can rerun setup again.");
+  };
+
+  // const handleSendOtp = async (event) => {
+  //   event?.preventDefault();
+  //   console.log("EMAIL =", email);
+  //   console.log("PASSWORD =", password);
+
+  //   setMessage("Sending OTP...");
+
+  //   try {
+  //     await api.post("/auth/send-otp", {
+  //       email,
+  //       password,
+  //     });
+  //     setOtpSent(true);
+  //     setMessage("OTP sent to your email. Enter it below to verify.");
+  //   } catch (error) {
+  //     setMessage(
+  //       error.response?.data?.error || error.message || "Sending OTP failed"
+  //     );
+  //   }
+  // };
 
   const handleVerifyOtp = async () => {
     setMessage("Verifying OTP...");
@@ -156,6 +276,9 @@ function App() {
     localStorage.removeItem("authToken");
     setToken("");
     setUsers([]);
+    setPanelOpen(false);
+    setPanelMinimized(false);
+    setPanelMaximized(false);
     setMessage("Logged out.");
   };
 
@@ -173,9 +296,13 @@ function App() {
       });
 
       setUsers(response.data || []);
+      setPanelOpen(true);
+      setPanelMinimized(false);
+      setPanelMaximized(false);
       setMessage("Users fetched successfully.");
     } catch (error) {
       setUsers([]);
+      setPanelOpen(false);
       setMessage(
         error.response?.data?.error || error.response?.data || error.message ||
           "Failed to load users"
@@ -241,6 +368,83 @@ function App() {
           </div>
         </form>
 
+        {loginMfaRequired && (
+          <div className="otp-section">
+            <h3>Enter MFA Code</h3>
+            <p>Use the SafeAuth app to get the next one-time code.</p>
+            <label>
+              Authenticator code
+              <input
+                type="text"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                placeholder="Enter 6-digit code"
+              />
+            </label>
+            <div className="auth-actions">
+              <button type="button" className="primary" onClick={handleLogin}>
+                Verify code
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setLoginMfaRequired(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="mfa-section">
+          <div className="mfa-toggle-row">
+            <span>MFA</span>
+            <button
+              type="button"
+              className={`toggle-button ${mfaToggleOn ? "on" : ""}`}
+              onClick={handleToggleMfa}
+            >
+              {mfaToggleOn ? "On" : "Off"}
+            </button>
+          </div>
+
+          {mfaToggleOn && mfaEnabled && (
+            <p className="mfa-status">MFA is enabled for this account.</p>
+          )}
+
+          {mfaToggleOn && !mfaEnabled && !mfaQrCodeData && (
+            <div className="mfa-action-row">
+              <button type="button" className="secondary" onClick={handleSetupMfa}>
+                Setup MFA
+              </button>
+            </div>
+          )}
+
+          {mfaQrCodeData && (
+            <div className="mfa-setup-panel">
+              <p>Scan this QR code with the SafeAuth app.</p>
+              <img className="mfa-qr" src={mfaQrCodeData} alt="MFA setup QR code" />
+              <label>
+                Authenticator code
+                <input
+                  type="text"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  placeholder="Enter code from SafeAuth"
+                />
+              </label>
+              <div className="auth-actions">
+                <button type="button" className="primary" onClick={handleVerifyMfaSetup}>
+                  Verify MFA code
+                </button>
+                <button type="button" className="secondary" onClick={handleCancelMfaSetup}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {mode === "register" && otpSent && (
           <div className="otp-section">
             <h3>Verify Your Email</h3>
@@ -290,9 +494,43 @@ function App() {
         </div>
       </div>
 
-      {users.length > 0 && (
-        <div className="users-panel">
-          <h2>Protected Users</h2>
+      {panelOpen && users.length > 0 && (
+        <div className={`users-panel ${panelMaximized ? "maximized" : ""} ${panelMinimized ? "minimized" : ""}`}>
+          <div className="users-panel-header">
+            <div>
+              <h2>Protected Users</h2>
+              <p className="users-panel-meta">{users.length} users loaded</p>
+            </div>
+            <div className="panel-controls">
+              <button
+                type="button"
+                className="panel-button"
+                onClick={() => setPanelMinimized((prev) => !prev)}
+                aria-label={panelMinimized ? "Restore users panel" : "Minimize users panel"}
+              >
+                {panelMinimized ? "▢" : "–"}
+              </button>
+              <button
+                type="button"
+                className="panel-button"
+                onClick={() => {
+                  setPanelMaximized((prev) => !prev);
+                  if (panelMinimized) setPanelMinimized(false);
+                }}
+                aria-label={panelMaximized ? "Restore users panel" : "Maximize users panel"}
+              >
+                {panelMaximized ? "❐" : "☐"}
+              </button>
+              <button
+                type="button"
+                className="panel-button close-button"
+                onClick={() => setPanelOpen(false)}
+                aria-label="Close users panel"
+              >
+                ×
+              </button>
+            </div>
+          </div>
           <ul>
             {users.map((user) => (
               <li key={user.id}>{user.email}</li>

@@ -3,16 +3,21 @@ package com.palak.authvault.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-public class LoginRequest {
+public class MfaRequest {
 
     @Email
     @NotBlank
     private String email;
 
     @NotBlank
-    private String password;
+    private String secret;
 
-    private String otp;
+    public MfaRequest() {}
+
+    public MfaRequest(String email, String secret) {
+        this.email = email;
+        this.secret = secret;
+    }
 
     public String getEmail() {
         return email;
@@ -22,19 +27,11 @@ public class LoginRequest {
         this.email = email;
     }
 
-    public String getPassword() {
-        return password;
+    public String getSecret() {
+        return secret;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getOtp() {
-        return otp;
-    }
-
-    public void setOtp(String otp) {
-        this.otp = otp;
+    public void setSecret(String secret) {
+        this.secret = secret;
     }
 }
